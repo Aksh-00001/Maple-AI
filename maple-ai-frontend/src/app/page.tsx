@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, createContext, useContext, FC, ReactNode, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, Code, ArrowRight, Home, Bot, History, Upload, Link as LinkIcon, Loader2, BarChart2, FileText, BrainCircuit, Lightbulb, AlertCircle, Terminal, Menu, Moon, Sun, Palette, Check, LucideProps, X, Trash2 } from 'lucide-react';
+import { Book, Code, ArrowRight, Home, Bot, History, Upload, Loader2, BarChart2, FileText, BrainCircuit, Lightbulb, AlertCircle, Terminal, Menu, Moon, Sun, Palette, Check, LucideProps, X, Trash2 } from 'lucide-react';
 import { cva, type VariantProps } from "class-variance-authority";
 import { twMerge } from "tailwind-merge";
 
@@ -24,19 +24,30 @@ interface ThemeContextType {
   setColorTheme: React.Dispatch<React.SetStateAction<ColorTheme>>;
 }
 
+interface DataVisualization {
+  type: string;
+  title: string;
+  data: {
+    labels: string[];
+    datasets: { label?: string; data: number[]; backgroundColor: string | string[] }[];
+  };
+}
+
 interface AnalysisResult {
   summary: string;
   keyPoints: string[];
   detailedSummary: { topic: string; detail: string; }[];
-  dataVisualizations: any[];
+  dataVisualizations: DataVisualization[];
 }
+
+type HistoryItemData = Record<string, unknown>;
 
 interface HistoryItem {
   id: string;
   type: 'research' | 'code';
   title: string;
   timestamp: number;
-  data?: any;
+  data?: HistoryItemData;
 }
 
 interface CodeSuggestion {
@@ -474,27 +485,54 @@ interface MobileSidebarProps extends SidebarProps {
   setIsOpen: (isOpen: boolean) => void;
 }
 
-const MobileSidebar: FC<MobileSidebarProps & { setShowHistory: (show: boolean) => void }> = ({ navigate, setContent, isOpen, setIsOpen, setShowHistory }) => (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent side="left" className="w-72 p-0">
-             <aside className="w-full h-full flex flex-col bg-muted/40 p-4 border-r">
-                <div className="flex items-center gap-3 mb-8">
-                    <Logo size={32} />
-                    <h2 className="text-2xl font-bold">
-                        <span className="text-green-400">Maple.AI</span>
-                    </h2>
-                </div>
-                <nav className="flex flex-col gap-2">
-                    <SidebarButton icon={Home} label="Main Page" onClick={() => { navigate('landing'); setIsOpen(false); }} />
-                    <SidebarButton icon={Bot} label="Dashboard" onClick={() => { setContent('dashboard'); setShowHistory(false); setIsOpen(false); }} />
-                    <SidebarButton icon={Book} label="Research Mode" onClick={() => { setContent('research'); setShowHistory(false); setIsOpen(false); }} />
-                    <SidebarButton icon={Code} label="Coding Mode" onClick={() => { setContent('code'); setShowHistory(false); setIsOpen(false); }} />
-                    <SidebarButton icon={History} label="History" onClick={() => { setShowHistory(true); setContent('dashboard'); setIsOpen(false); }} />
-                </nav>
-            </aside>
-        </SheetContent>
-    </Sheet>
-);
+const MobileSidebar: FC<MobileSidebarProps & { setShowHistory: (show: boolean) => void }> = ({ navigate, setContent, isOpen, setIsOpen, setShowHistory }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 md:hidden">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => setIsOpen(false)}
+      />
+      {/* Panel */}
+      <motion.aside
+        initial={{ x: '-100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '-100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className={`absolute left-0 top-0 h-full w-72 flex flex-col p-4 border-r backdrop-blur-md transition-all duration-500 ${
+          isDark ? 'bg-black/90 border-white/10' : 'bg-white/90 border-gray-200/50'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Logo size={32} />
+            <h2 className="text-2xl font-bold">
+              <span className={isDark ? 'text-teal-400' : 'text-teal-600'}>Maple.AI</span>
+            </h2>
+          </div>
+          <button onClick={() => setIsOpen(false)} className={`p-2 rounded-lg ${isDark ? 'text-white/70 hover:bg-white/10' : 'text-gray-700 hover:bg-gray-100'}`}>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <nav className="flex flex-col gap-2">
+          <SidebarButton icon={Home} label="Main Page" onClick={() => { navigate('landing'); setIsOpen(false); }} />
+          <SidebarButton icon={Bot} label="Dashboard" onClick={() => { setContent('dashboard'); setShowHistory(false); setIsOpen(false); }} />
+          <SidebarButton icon={Book} label="Research Mode" onClick={() => { setContent('research'); setShowHistory(false); setIsOpen(false); }} />
+          <SidebarButton icon={Code} label="Coding Mode" onClick={() => { setContent('code'); setShowHistory(false); setIsOpen(false); }} />
+          <SidebarButton icon={History} label="History" onClick={() => { setShowHistory(true); setContent('dashboard'); setIsOpen(false); }} />
+        </nav>
+      </motion.aside>
+    </div>
+  );
+};
 
 interface SidebarButtonProps {
     icon: React.ElementType<LucideProps>;
@@ -658,20 +696,25 @@ const ResearchPage: FC = () => {
     if (!file && !url) { setError("Please upload a file or enter a URL."); return; }
     setIsLoading(true); setResults(null); setError(null);
     try {
-        const formData = new FormData();
-        if (file) {
-          formData.append('file', file);
-        } else if (url) {
-          // For URL, we'd need backend support for URL fetching
-          // For now, show error if URL is provided
-          throw new Error("URL analysis not yet supported. Please upload a PDF file.");
-        }
-        
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-        const response = await fetch(`${apiUrl}/analyze-pdf/`, { method: 'POST', body: formData });
+        let response: Response;
+
+        if (file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          response = await fetch(`${apiUrl}/analyze-pdf/`, { method: 'POST', body: formData });
+        } else {
+          // URL analysis — backend fetches and parses the PDF
+          response = await fetch(`${apiUrl}/analyze-url/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+        }
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Analysis failed');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Server error: ${response.status}`);
         }
         const data: AnalysisResult = await response.json();
         setResults(data);
@@ -679,11 +722,11 @@ const ResearchPage: FC = () => {
         // Save to history
         addHistoryItem({
           type: 'research',
-          title: file ? file.name : 'Research Analysis',
-          data: data
+          title: file ? file.name : (url || 'Research Analysis'),
+          data: data as unknown as HistoryItemData
         });
-    } catch (err: any) {
-        setError(err.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred. Is the backend running?");
     } finally {
         setIsLoading(false);
     }
@@ -875,18 +918,9 @@ const ResearchPage: FC = () => {
               </ul>
             </ResultCard>
             <ResultCard icon={BarChart2} title="Data Visualizations">
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {results.dataVisualizations.map((viz, i) => (
-                  <div key={i} className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">{viz.title}</h4>
-                    <div className="h-48 bg-muted/40 rounded flex items-center justify-center">
-                      <div className="text-center text-muted-foreground">
-                        <BarChart2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">{viz.type} chart visualization</p>
-                        <p className="text-xs mt-1">Data: {JSON.stringify(viz.data).substring(0, 100)}...</p>
-                      </div>
-                    </div>
-                  </div>
+                  <BarChartViz key={i} viz={viz} />
                 ))}
               </div>
             </ResultCard>
@@ -925,8 +959,56 @@ const ResultCard: FC<ResultCardProps> = ({ icon: Icon, title, children }) => {
     );
 };
 
+// --- Bar Chart Visualization Component ---
+const BarChartViz: FC<{ viz: DataVisualization }> = ({ viz }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const dataset = viz.data?.datasets?.[0];
+  const labels: string[] = viz.data?.labels || [];
+  const values: number[] = dataset?.data || [];
+  const colors: string[] = Array.isArray(dataset?.backgroundColor)
+    ? (dataset.backgroundColor as string[])
+    : labels.map(() => (typeof dataset?.backgroundColor === 'string' ? dataset.backgroundColor : 'rgba(20,184,166,0.7)'));
+  const maxVal = Math.max(...values, 1);
+
+  return (
+    <div className={`rounded-lg p-4 border transition-all duration-500 ${
+      isDark ? 'border-white/10 bg-black/20' : 'border-gray-200/50 bg-white/20'
+    }`}>
+      <h4 className={`font-semibold mb-4 text-sm ${isDark ? 'text-white/80' : 'text-gray-700'}`}>{viz.title}</h4>
+      <div className="flex items-end gap-2 h-36">
+        {values.map((val, idx) => {
+          const heightPct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+          return (
+            <div key={idx} className="flex flex-col items-center flex-1 gap-1">
+              <span className={`text-xs font-mono ${isDark ? 'text-white/60' : 'text-gray-500'}`}>{val}</span>
+              <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: `${heightPct}%` }}
+                transition={{ duration: 0.6, delay: idx * 0.1, ease: 'easeOut' }}
+                className="w-full rounded-t-md min-h-[4px]"
+                style={{ backgroundColor: colors[idx] || 'rgba(20,184,166,0.7)' }}
+                title={`${labels[idx]}: ${val}`}
+              />
+              <span className={`text-xs text-center leading-tight ${isDark ? 'text-white/50' : 'text-gray-500'}`}
+                style={{ fontSize: '10px', maxWidth: '60px', wordBreak: 'break-word' }}>
+                {labels[idx]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {dataset?.label && (
+        <p className={`text-xs mt-3 text-center ${isDark ? 'text-white/40' : 'text-gray-400'}`}>{dataset.label}</p>
+      )}
+    </div>
+  );
+};
+
 // --- Coding Mode Page ---
 const CodePage: FC = () => {
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     const [code, setCode] = useState(`/* Welcome to the AI Coding Copilot! */\n\nfunction greet(name) {\n  return "Hello, " + name + "!";\n}\n\nconsole.log(greet("World"));`);
     const [aiSuggestions, setAiSuggestions] = useState<{ title: string; suggestions: Array<{ icon: React.ElementType<LucideProps>; title: string; description: string }> }>({ 
         title: "AI Analysis", 
@@ -988,6 +1070,8 @@ const CodePage: FC = () => {
         if (code.length > 10) {
             analyzeCode(code);
         }
+        // Run once on mount only — intentionally omitting deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleSave = () => {
@@ -1134,8 +1218,15 @@ const Logo: FC<{ size?: number }> = ({ size = 32 }) => (
 );
 
 // --- UI Primitives (from shadcn/ui) ---
-const buttonVariants = cva( "inline-flex items-center justify-center rounded-md text-sm font-medium", {
-    variants: { variant: { default: "bg-primary text-primary-foreground", outline: "border bg-transparent" }, size: { default: "h-10 px-4", lg: "h-11 px-8", icon: "h-10 w-10" } },
+const buttonVariants = cva( "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors", {
+    variants: {
+        variant: {
+            default: "bg-primary text-primary-foreground hover:bg-primary/90",
+            outline: "border bg-transparent hover:bg-accent",
+            ghost: "bg-transparent hover:bg-accent hover:text-accent-foreground",
+        },
+        size: { default: "h-10 px-4", lg: "h-11 px-8", icon: "h-10 w-10", sm: "h-8 px-3 text-xs" },
+    },
     defaultVariants: { variant: "default", size: "default" },
 });
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
@@ -1144,15 +1235,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, va
 ));
 Button.displayName = "Button";
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>((props, ref) => <div ref={ref} {...props} />);
-const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((props, ref) => <input ref={ref} {...props} />);
-const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLLabelElement>>((props, ref) => <label ref={ref} {...props} />);
-interface SheetProps { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode; }
-const Sheet: FC<SheetProps> = ({ open, onOpenChange, children }) => ( open ? <>{children}</> : null );
-interface SheetContentProps { side?: 'left' | 'right'; className?: string; children: ReactNode; }
-const SheetContent: FC<SheetContentProps> = ({ side = 'left', className, children }) => ( <div className={className}>{children}</div> );
+Card.displayName = "Card";
 
 // --- History Page ---
-const HistoryPage: FC<{ onClose: () => void }> = ({ onClose }) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const HistoryPage: FC<{ onClose: () => void }> = (_onClose) => {
     const { history, clearHistory, removeHistoryItem } = useHistory();
 
     const formatDate = (timestamp: number) => {
@@ -1198,12 +1285,12 @@ const HistoryPage: FC<{ onClose: () => void }> = ({ onClose }) => {
                                             <p className="text-sm text-muted-foreground mt-1">
                                                 {formatDate(item.timestamp)} • {item.type === 'research' ? 'Research Analysis' : 'Code Session'}
                                             </p>
-                                            {item.type === 'research' && item.data?.summary && (
+                                            {item.type === 'research' && typeof item.data?.summary === 'string' && (
                                                 <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                                                     {item.data.summary.substring(0, 150)}...
                                                 </p>
                                             )}
-                                            {item.type === 'code' && item.data?.code && (
+                                            {item.type === 'code' && typeof item.data?.code === 'string' && (
                                                 <pre className="text-xs bg-muted/40 p-2 rounded mt-2 overflow-x-auto">
                                                     {item.data.code.substring(0, 100)}...
                                                 </pre>

@@ -1,109 +1,116 @@
-# Setting Up Real AI Integration
+# Setting Up Google Gemini AI Integration (FREE)
 
-## Quick Setup Guide
+Maple.AI uses the **Google Gemini free API** — no credit card required!
 
-### Step 1: Get OpenAI API Key
+---
 
-1. Go to https://platform.openai.com/
-2. Sign up or log in
-3. Navigate to API Keys: https://platform.openai.com/api-keys
-4. Click "Create new secret key"
-5. Copy your API key (starts with `sk-`)
+## Quick Setup (5 minutes)
+
+### Step 1: Get Your Free Gemini API Key
+
+1. Go to **[Google AI Studio](https://aistudio.google.com/app/apikey)**
+2. Sign in with your Google account
+3. Click **"Create API key"**
+4. Copy your API key
+
+> **Free Tier Limits (as of 2025)**:
+> - 15 requests/minute
+> - 1,000,000 tokens/minute  
+> - 1,500 requests/day  
+> — More than enough for personal and demo use!
+
+---
 
 ### Step 2: Configure Environment Variables
 
-1. Navigate to the backend directory:
-   ```bash
-   cd maple-ai-backend
-   ```
+#### For Local Development
 
-2. Create a `.env` file:
-   ```bash
-   # On Windows
-   copy .env.example .env
-   
-   # On Mac/Linux
-   cp .env.example .env
-   ```
-
-3. Open `.env` file and paste your API key:
-   ```
-   OPENAI_API_KEY=sk-your-actual-api-key-here
-   FRONTEND_URL=http://localhost:3000
-   PORT=8000
-   ```
-
-### Step 3: Install Dependencies
+Navigate to the backend directory and create a `.env` file:
 
 ```bash
 cd maple-ai-backend
-pip install -r requirements.txt
+copy .env.example .env
 ```
 
-This will install:
-- OpenAI Python library
-- PDF parsing libraries (pdfplumber, PyPDF2)
+Open `.env` and set:
+```
+GEMINI_API_KEY=AIza...your-key-here
+FRONTEND_URL=http://localhost:3000
+PORT=8000
+```
 
-### Step 4: Start the Backend
+#### For Docker Compose
 
+At the project root, create `.env`:
 ```bash
-python main.py
+copy .env.example .env
 ```
 
-Or with auto-reload:
+Edit it:
+```
+GEMINI_API_KEY=AIza...your-key-here
+NEXT_PUBLIC_API_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+```
+
+Then run:
 ```bash
-uvicorn main:app --reload
+docker-compose up -d
 ```
 
-### Step 5: Verify It's Working
+---
 
-1. Check the backend logs - you should see:
+### Step 3: Verify It's Working
+
+1. Start the backend:
+   ```bash
+   cd maple-ai-backend
+   pip install -r requirements.txt
+   python main.py
    ```
-   INFO: OpenAI client initialized successfully
+
+2. Check the logs for:
+   ```
+   ✅ Gemini client initialized successfully (gemini-1.5-flash)
    ```
 
-2. Test the API:
-   - Go to http://localhost:8000/docs
-   - Try the `/analyze-pdf/` or `/analyze-code/` endpoints
+3. Test the API at **[http://localhost:8000/health](http://localhost:8000/health)**:
+   ```json
+   {"status": "healthy", "gemini_ready": true}
+   ```
 
-## Cost Information
+---
 
-- **Model Used**: `gpt-4o-mini` (cost-effective)
-- **Approximate Costs**:
-  - PDF Analysis: ~$0.01-0.05 per paper (depending on length)
-  - Code Analysis: ~$0.001-0.01 per analysis
-- **Free Tier**: OpenAI offers $5 free credit for new accounts
+## Fallback Mode (No API Key)
+
+If no `GEMINI_API_KEY` is provided, the app runs in **mock mode** — all analysis returns pre-defined sample data. Great for testing the UI!
+
+---
 
 ## Troubleshooting
 
-### "OpenAI package not installed"
+### "google-generativeai package not installed"
 ```bash
-pip install openai
+pip install google-generativeai
 ```
 
 ### "API key not found"
-- Make sure `.env` file exists in `maple-ai-backend/` directory
-- Check that `OPENAI_API_KEY=sk-...` is in the file
-- Restart the backend server
+- Make sure `maple-ai-backend/.env` exists
+- Confirm the key is set: `GEMINI_API_KEY=AIza...`
+- Restart the backend
 
-### "Rate limit exceeded"
-- You've hit OpenAI's rate limits
-- Wait a few minutes or upgrade your OpenAI plan
+### "Resource exhausted" (rate limit)
+- You've hit the free tier rate limit (15 req/min)
+- Wait a minute and try again
+- The free tier resets daily
 
-### "Insufficient credits"
-- Add payment method to your OpenAI account
-- Or use the free tier ($5 credit)
+### JSON parse errors in logs
+This is usually a transient Gemini response issue. The app will fall back to mock results automatically.
 
-## Fallback Mode
+---
 
-If no API key is provided, the app will work with **mock AI analysis** - perfect for testing without costs!
+## Model Used
 
-## Alternative: Use Anthropic (Claude)
-
-If you prefer Claude over GPT:
-
-1. Get API key from: https://console.anthropic.com/
-2. Install: `pip install anthropic`
-3. Update `main.py` to use Anthropic instead of OpenAI
-4. Set `ANTHROPIC_API_KEY` in `.env`
-
+- **Model**: `gemini-1.5-flash`
+- **Why**: Fastest, most efficient Gemini model — perfect for real-time analysis
+- **Context**: Supports up to 1 million tokens (handles large PDFs easily)
